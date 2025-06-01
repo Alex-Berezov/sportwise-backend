@@ -1,0 +1,195 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role      @default(AUTHOR)
+  posts     Post[]    @relation("PostAuthor")
+  comments  Comment[]
+  media     Media[]   @relation("UserMedia")
+  createdAt DateTime  @default(now())
+}
+enum Role {
+  ADMIN
+  EDITOR
+  AUTHOR
+  SUBSCRIBER
+}
+
+model Post {
+  id           Int            @id @default(autoincrement())
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  title        String
+  slug         String         @unique
+  content      String         // полный HTML/Markdown
+  excerpt      String?        // короткий анонс
+  status       PostStatus     @default(DRAFT)
+  publishedAt  DateTime?
+  author       User           @relation("PostAuthor", fields: [authorId], references: [id])
+  authorId     Int
+  categories   Category[]     @relation("PostsOnCategories")
+  tags         Tag[]          @relation("PostsOnTags")
+  comments     Comment[]
+  featuredImageId  Int?     @unique
+  featuredImage    Media?   @relation("PostFeaturedImage", fields: [featuredImageId], references: [id])
+  mediaAttachments Media[]  @relation("PostMedia")
+  seo        Seo?    @relation()
+  
+  translations PostTranslation[]
+}
+enum PostStatus {
+  DRAFT
+  PENDING   // на модерации
+  PUBLISHED
+  PRIVATE
+}
+
+model PostTranslation {
+  id         Int     @id @default(autoincrement())
+  post       Post    @relation(fields: [postId], references: [id])
+  postId     Int
+  locale     String  // "en", "ru", "hy"…
+  title      String
+  content    String
+  excerpt    String?
+  slug       String  @unique
+  
+  // ВЛАДЕЛЬЧЕСКАЯ сторона связи 1:1 — здесь поля и ссылки
+  seo        Seo?    @relation("PostTranslationSeo", fields: [seoId], references: [id])
+  seoId      Int?    @unique
+
+  @@unique([postId, locale])
+}
+
+
+model Seo {
+  id                   Int       @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // === Основные мета-теги ===
+  metaTitle            String?   // <title> и <meta name="title">
+  metaDescription      String?   // <meta name="description">
+  canonicalUrl         String?   // <link rel="canonical">
+  robots               String?   // <meta name="robots" content="index,follow">
+
+  // === Open Graph ===
+  ogTitle              String?   // <meta property="og:title">
+  ogDescription        String?   // <meta property="og:description">
+  ogType               String?   // <meta property="og:type"> (article, website…)
+  ogUrl                String?   // <meta property="og:url">
+  ogImageUrl           String?   // <meta property="og:image">
+  ogImageAlt           String?   // <meta property="og:image:alt">
+
+  // === Twitter Card ===
+  twitterCard          String?   // <meta name="twitter:card"> (summary, summary_large_image…)
+  twitterSite          String?   // <meta name="twitter:site">
+  twitterCreator       String?   // <meta name="twitter:creator">
+
+  // === Разметка событий (schema.org/Event) ===
+  eventName            String?   // name
+  eventDescription     String?   // description
+  eventStartDate       DateTime? // startDate
+  eventEndDate         DateTime? // endDate
+  eventUrl             String?   // url страницы события
+  eventImageUrl        String?   // image
+  eventLocationName    String?   // location.name
+  eventLocationStreet  String?   // location.address.streetAddress
+  eventLocationCity    String?   // location.address.addressLocality
+  eventLocationRegion  String?   // location.address.addressRegion
+  eventLocationPostal  String?   // location.address.postalCode
+  eventLocationCountry String?   // location.address.addressCountry
+
+  // ОБРАТНАЯ сторона связи 1:1 — без fields/references
+  translation          PostTranslation? @relation("PostTranslationSeo")
+
+  // связь с Post (если она вам нужна)
+  post                 Post?     @relation(fields: [postId], references: [id])
+  postId               Int?      @unique
+}
+
+
+model Category {
+  id          Int        @id @default(autoincrement())
+  name        String
+  slug        String     @unique
+  description String?
+  parent      Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  parentId    Int?
+  children    Category[] @relation("CategoryChildren")
+  posts       Post[]     @relation("PostsOnCategories")
+}
+
+model Tag {
+  id    Int     @id @default(autoincrement())
+  name  String
+  slug  String  @unique
+  posts Post[]  @relation("PostsOnTags")
+}
+
+model Comment {
+  id         Int       @id @default(autoincrement())
+  content    String
+  author     User?     @relation(fields: [authorId], references: [id])
+  authorId   Int?
+  guestName  String?   // для анонимных/гостевых
+  guestEmail String?
+  post       Post      @relation(fields: [postId], references: [id])
+  postId     Int
+  parent     Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  parentId   Int?
+  replies    Comment[] @relation("CommentReplies")
+  status     CommentStatus @default(PENDING)
+  createdAt  DateTime  @default(now())
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  SPAM
+  TRASH
+}
+
+model Media {
+  id         Int      @id @default(autoincrement())
+  createdAt  DateTime @default(now())
+
+  url        String
+  mimeType   String
+  filename   String
+  uploadedBy User     @relation("UserMedia", fields: [uploadedById], references: [id])
+  uploadedById Int
+  postId        Int?     
+  post          Post?    @relation("PostMedia", fields: [postId], references: [id])
+  featuredFor   Post?    @relation("PostFeaturedImage")
+}
+
+// TODO: со схемой закончили, теперь нужно:
+
+// 3. Заполнить базу тестовыми данными (можно использовать Prisma Studio: `npx prisma studio`)
+// 4. Реализовать CRUD API для моделей (например, с помощью Express или Next.js API Routes)
+// 5. Добавить авторизацию и аутентификацию (например, с помощью Passport.js или JWT)
+// 6. Реализовать логику для SEO (например, с помощью middleware или хуков)
+// 7. Настроить обработку медиафайлов (например, с помощью Multer или Cloudinary)
+// 8. Реализовать логику для комментариев (например, с помощью WebSockets для реального времени)
+// 9. Добавить тесты для API и бизнес-логики (например, с помощью Jest или Mocha)
+// 10. Настроить CI/CD для автоматического деплоя (например, с помощью GitHub Actions или Travis CI)
+// 11. Документировать API (например, с помощью Swagger или Postman)
+// 12. Настроить мониторинг и логирование (например, с помощью Sentry или LogRocket)
+// 13. Реализовать кэширование (например, с помощью Redis или Memcached)
+// 14. Настроить защиту от CSRF/XSS (например, с помощью helmet.js или csurf)
+// 15. Реализовать логику для перевода контента (например, с помощью i18next или react-intl)
+// 16. Добавить поддержку вебхуков (например, для интеграции с внешними сервисами)
+// 17. Реализовать логику для создания и управления событиями (например, с помощью календаря или событийного API)
+// 18. Настроить систему уведомлений (например, с помощью email или push-уведомлений)
