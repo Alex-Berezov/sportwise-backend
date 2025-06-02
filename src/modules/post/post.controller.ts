@@ -8,12 +8,15 @@ import {
   Param,
   HttpException,
   HttpStatus,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PostStatus } from '@prisma/client';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { CreateTranslationDto } from './dto/create-translation.dto';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('posts')
 export class PostController {
@@ -21,10 +24,11 @@ export class PostController {
 
   // === 1. Создание нового черновика ===
   // POST /posts
+  @UseGuards(AuthGuard('jwt'))
   @HttpPost()
-  async create(@Body() dto: CreatePostDto) {
+  async create(@Request() req, @Body() dto: CreatePostDto) {
     try {
-      const authorId = 1; // TODO: получать из Guard / JWT
+      const authorId = req.user.userId;
       return await this.postService.createDraft(authorId, dto);
     } catch (err) {
       if (err instanceof HttpException) throw err;

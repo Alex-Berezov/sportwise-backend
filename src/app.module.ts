@@ -1,10 +1,9 @@
-// src/app.module.ts
-
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module'; // обязательно подключаем
 import { PostModule } from './modules/post/post.module'; // модуль блога
 import { CategoryModule } from './modules/category/category.module'; // при необходимости
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -20,8 +19,8 @@ import { CategoryModule } from './modules/category/category.module'; // при �
     // 3) Подключаем модуль блога (PostModule). Когда появятся другие модули – их тоже добавляем сюда
     PostModule,
     CategoryModule,
+    AuthModule,
     // TagModule,
-    // AuthModule,
     // и т.д.
   ],
   controllers: [
